@@ -1,6 +1,6 @@
 # This file implements script to train a language model using PyTorch's Transformer modules. 
 
-
+import os
 import hydra
 from omegaconf import DictConfig
 import torch
@@ -9,7 +9,6 @@ from model.model import LanguageModel
 from utils.data import LMDataset
 import mlflow
 import mlflow.pytorch
-import psutil
 
 @hydra.main(config_path="../../configs", config_name="train_config", version_base=None)
 def main(cfg: DictConfig):
@@ -24,100 +23,77 @@ def main(cfg: DictConfig):
         mlflow.log_params(dict(cfg.model))
         mlflow.log_params(dict(cfg.training))
 
-    # Initialize model, optimizer, loss function
-    model = LanguageModel(cfg.dataset.vocab_size,
-                          cfg.model.d_model,
-                          cfg.model.nhead,
-                          cfg.model.num_layers,
-                          dim_feedforward=cfg.model.dim_feedforward,
-                          dropout=cfg.model.dropout)
-    # Move model to GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    # Print model parameter count
-    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model has {total_params} trainable parameters.")
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay) #We can also add learning rate schedulers here
-    loss_func = torch.nn.CrossEntropyLoss() 
+        # Initialize model, optimizer, loss function
+        model = LanguageModel(
+            cfg.model.vocab_size,
+            cfg.model.d_model,
+            cfg.model.nhead,
+            cfg.model.num_layers,
+            dim_feedforward=cfg.model.dim_feedforward,
+            dropout=cfg.model.dropout)
+        # Move model to GPU if available
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = model.to(device)
+        # Print model parameter count
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"Model has {total_params} trainable parameters.")
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay)
+        loss_func = torch.nn.CrossEntropyLoss() 
 
-    # DataLoader setup
-    # Use LMDataset to create tokenized, fixed-length samples for language modeling
-    dataset = LMDataset(
-        file_path=cfg.dataset.data_path,
-        vocab_size=cfg.dataset.vocab_size,
-        tokenizer_dir=cfg.dataset.tokenizer_dir,
-        context_length=cfg.model.context_length  # Make sure this matches your model config
-    )
-    train_size = int(0.9 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+        # DataLoader setup
+        dataset = LMDataset(
+            file_path=cfg.dataset.data_path,
+            tokenizer_dir=cfg.dataset.tokenizer_dir,
+            context_length=cfg.model.context_length
+        )
+        train_size = int(0.9 * len(dataset))
+        val_size = len(dataset) - train_size
+        train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    # No need for a custom collate_fn since all samples are the same length
-    train_loader = DataLoader(train_dataset, batch_size=cfg.training.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=cfg.training.batch_size)
-    
+        train_loader = DataLoader(train_dataset, batch_size=cfg.training.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=cfg.training.batch_size)
 
-    # Training Loop
-    for epoch in range(cfg.training.epochs):
-        model.train()
-        total_loss = 0
-        for batch in train_loader:
-            inputs = batch.to(device).transpose(0, 1)  # Now (seq_len, batch_size)
-            optimizer.zero_grad()
-            outputs = model(inputs[:-1, :])  # Predict next token
-            loss = loss_func(outputs.view(-1, outputs.size(-1)), inputs[1:, :].reshape(-1))
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        avg_loss = total_loss / len(train_loader)
-        print(f"Epoch {epoch+1}/{cfg.training.epochs}, Training Loss: {avg_loss:.4f}")
-        mlflow.log_metric("train_loss", avg_loss, step=epoch)
-
-        # Log learning rate and weight decay for the first param group (most common case)
-        current_lr = optimizer.param_groups[0]['lr']
-        current_wd = optimizer.param_groups[0].get('weight_decay', None)
-        mlflow.log_metric("learning_rate", current_lr, step=epoch)
-        if current_wd is not None:
-            mlflow.log_metric("weight_decay", current_wd, step=epoch)
-
-        # Log CPU and memory usage
-        cpu_percent = psutil.cpu_percent(interval=None)
-        memory_info = psutil.virtual_memory()
-        memory_percent = memory_info.percent
-        memory_used_gb = memory_info.used / (1024 ** 3)
-        
-        mlflow.log_metric("cpu_usage_percent", cpu_percent, step=epoch)
-        mlflow.log_metric("memory_usage_percent", memory_percent, step=epoch)
-        mlflow.log_metric("memory_used_gb", memory_used_gb, step=epoch)
-        
-        # Log GPU usage if available
-        if torch.cuda.is_available():
-            gpu_memory_allocated = torch.cuda.memory_allocated(device) / (1024 ** 3)
-            gpu_memory_reserved = torch.cuda.memory_reserved(device) / (1024 ** 3)
-            gpu_utilization = torch.cuda.utilization(device) if hasattr(torch.cuda, 'utilization') else None
-            
-            mlflow.log_metric("gpu_memory_allocated_gb", gpu_memory_allocated, step=epoch)
-            mlflow.log_metric("gpu_memory_reserved_gb", gpu_memory_reserved, step=epoch)
-            if gpu_utilization is not None:
-                mlflow.log_metric("gpu_utilization_percent", gpu_utilization, step=epoch)
-
-
-        # Validation Loop
-        model.eval()
-        val_loss = 0
-        with torch.no_grad():
-            for batch in val_loader:
-                inputs = batch.to(device)
+        # Training Loop
+        for epoch in range(cfg.training.epochs):
+            model.train()
+            total_loss = 0
+            for batch in train_loader:
+                inputs = batch.to(device).transpose(0, 1)
+                optimizer.zero_grad()
                 outputs = model(inputs[:-1, :])
                 loss = loss_func(outputs.view(-1, outputs.size(-1)), inputs[1:, :].reshape(-1))
-                val_loss += loss.item()
-        avg_val_loss = val_loss / len(val_loader)
-        print(f"Epoch {epoch+1}/{cfg.training.epochs}, Validation Loss: {avg_val_loss:.4f}")
-        mlflow.log_metric("val_loss", avg_val_loss, step=epoch)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+            avg_loss = total_loss / len(train_loader)
+            print(f"Epoch {epoch+1}/{cfg.training.epochs}, Training Loss: {avg_loss:.4f}")
+            mlflow.log_metric("train_loss", avg_loss, step=epoch)
 
-    # Save the trained model: Can be also implemented to save best model based on validation loss
-    torch.save(model.state_dict(), cfg.training.model_save_path)
-    print("Training complete.")
+            # Log learning rate
+            mlflow.log_metric("learning_rate", optimizer.param_groups[0]['lr'], step=epoch)
+
+            # Validation Loop
+            model.eval()
+            val_loss = 0
+            with torch.no_grad():
+                for batch in val_loader:
+                    inputs = batch.to(device)
+                    outputs = model(inputs[:-1, :])
+                    loss = loss_func(outputs.view(-1, outputs.size(-1)), inputs[1:, :].reshape(-1))
+                    val_loss += loss.item()
+            avg_val_loss = val_loss / len(val_loader)
+            print(f"Epoch {epoch+1}/{cfg.training.epochs}, Validation Loss: {avg_val_loss:.4f}")
+            mlflow.log_metric("val_loss", avg_val_loss, step=epoch)
+
+        # Ensure model save directory exists
+        model_save_dir = os.path.dirname(cfg.training.model_save_path)
+        if model_save_dir and not os.path.exists(model_save_dir):
+            os.makedirs(model_save_dir)
+
+        # Save the trained model
+        torch.save(model.state_dict(), cfg.training.model_save_path)
+        print(f"Model saved to {cfg.training.model_save_path}")
+        print("Training complete.")
 
 if __name__ == "__main__":
     main()
