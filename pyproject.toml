@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "howtollm"
+version = "0.0.1"
+description = "Small scaffold for LLM experiments"
+authors = [{name = "Satya Shodhaka Rekha Prabhanjan", email = "satyashodhaka66@gmail.com"}]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+
+dependencies = [
+  "numpy >=1.24",
+  "pyyaml >=6.0",
+  "tqdm >=4.64",
+  "datasets >=2.0",
+  "transformers >=4.30",
+  "accelerate >=0.20",
+  "torch >=2.0; sys_platform == 'win32' or sys_platform == 'linux' or sys_platform == 'darwin'",
+  "wandb >=0.15",
+]
+
+[project.scripts]
+howtollm-train = "howtollm.train.train:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+extra-index-url = ["https://download.pytorch.org/whl/cu121"]
