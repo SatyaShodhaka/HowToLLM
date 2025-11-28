@@ -18,9 +18,6 @@ dependencies = [
   "datasets >=2.0",
   "transformers >=4.30",
   "accelerate >=0.20",
-  "torch",
-  "torchvision",
-  "torchaudio",
   "wandb >=0.15",
 ]
 
@@ -29,15 +26,3 @@ howtollm-train = "howtollm.train.train:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-# Only use pytroch index for downloading torch and use PyPI for general python dependencies
-[[tool.uv.index]]
-name = "pytorch-cu"
-url = "https://download.pytorch.org/whl/cu124" # "https://download.pytorch.org/whl/nightly/cu126" - use this for 5000 series Nvidia gpus on linux
-explicit = true
-
-# Define the dependencies to use custom index
-[tool.uv.sources]
-torch = { index = "pytorch-cu" }
-torchvision = { index = "pytorch-cu" }
-torchaudio = { index = "pytorch-cu" }
