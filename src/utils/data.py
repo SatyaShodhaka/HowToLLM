@@ -67,6 +67,7 @@ def train_tokenizer(file_path, vocab_size=32000, save_dir="data/tokenizer"):
         "bos_token_id": tokenizer.token_to_id("<s>"),
         "eos_token_id": tokenizer.token_to_id("</s>")
     }
+    print("Tokenizer: Trained tokenizer vocab size:", tokenizer.get_vocab_size())
     train_tokenizer(args.file_path, args.vocab_size, args.save_dir)
     metadata_path = os.path.join(save_dir, "tokenizer_metadata.json")
     with open(metadata_path, "w", encoding="utf-8") as f:

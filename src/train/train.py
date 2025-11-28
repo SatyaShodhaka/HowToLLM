@@ -40,6 +40,7 @@ def main(cfg: DictConfig):
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay)
         loss_func = torch.nn.CrossEntropyLoss() 
 
+        print("Preparing dataset...")
         # DataLoader setup
         dataset = LMDataset(
             file_path=cfg.dataset.data_path,
