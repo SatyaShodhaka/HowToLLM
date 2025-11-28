@@ -12,14 +12,14 @@ model:
 # Training configurations
 training:
   batch_size: 16
-  num_epochs: 10
-  learning_rate: 5e-5
+  epochs: 100
+  learning_rate: 1e-4
   weight_decay: 0.01
   warmup_steps: 1000
-  model_save_path: data/model
+  model_save_path: data/model/model.pth
 
 
 dataset:
   tokenizer_dir: data/tokenizer
-  vocab_size: 32000
-  data_path: data/dataset/data.txt
+  vocab_size: 24784
+  data_path: data/dataset/telugu.txt

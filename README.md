@@ -41,3 +41,9 @@ To activate the uv environment, run:
 ```bash
 source .venv/bin/activate
 ```
+
+### Enable MLflow System Metrics Logging
+To enable MLflow system metrics logging, set the following environment variable:
+
+```bash
+export MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING=true

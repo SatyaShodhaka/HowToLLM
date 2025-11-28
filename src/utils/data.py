@@ -9,8 +9,13 @@ class LMDataset(Dataset):
     Concatenates all text, tokenizes, and returns samples of length (context_length + 1).
     Each sample is a tensor of token IDs.
     """
-    def __init__(self, file_path, tokenizer_dir, context_length=512):
-        self.tokenizer = Tokenizer.from_file(tokenizer_dir)
+    def __init__(self, file_path, vocab_size, tokenizer_dir, context_length=512):
+
+        if not os.path.exists(os.path.join(tokenizer_dir, "tokenizer.json")):
+            self.tokenizer = train_tokenizer(file_path, vocab_size, tokenizer_dir)
+        else:
+            self.tokenizer = Tokenizer.from_file(os.path.join(tokenizer_dir, "tokenizer.json")
+                                                 )
         self.context_length = context_length
 
         # Read and concatenate all text

@@ -9,6 +9,7 @@ from model.model import LanguageModel
 from utils.data import LMDataset
 import mlflow
 import mlflow.pytorch
+import psutil
 
 @hydra.main(config_path="../../configs", config_name="train_config", version_base=None)
 def main(cfg: DictConfig):
@@ -24,10 +25,18 @@ def main(cfg: DictConfig):
         mlflow.log_params(dict(cfg.training))
 
     # Initialize model, optimizer, loss function
-    model = LanguageModel(**cfg.model)
+    model = LanguageModel(cfg.dataset.vocab_size,
+                          cfg.model.d_model,
+                          cfg.model.nhead,
+                          cfg.model.num_layers,
+                          dim_feedforward=cfg.model.dim_feedforward,
+                          dropout=cfg.model.dropout)
     # Move model to GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
+    # Print model parameter count
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model has {total_params} trainable parameters.")
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay) #We can also add learning rate schedulers here
     loss_func = torch.nn.CrossEntropyLoss() 
 
@@ -35,7 +44,8 @@ def main(cfg: DictConfig):
     # Use LMDataset to create tokenized, fixed-length samples for language modeling
     dataset = LMDataset(
         file_path=cfg.dataset.data_path,
-        tokenizer_dir=cfg.dataset.tokenizer_path,
+        vocab_size=cfg.dataset.vocab_size,
+        tokenizer_dir=cfg.dataset.tokenizer_dir,
         context_length=cfg.model.context_length  # Make sure this matches your model config
     )
     train_size = int(0.9 * len(dataset))
@@ -70,6 +80,28 @@ def main(cfg: DictConfig):
         if current_wd is not None:
             mlflow.log_metric("weight_decay", current_wd, step=epoch)
 
+        # Log CPU and memory usage
+        cpu_percent = psutil.cpu_percent(interval=None)
+        memory_info = psutil.virtual_memory()
+        memory_percent = memory_info.percent
+        memory_used_gb = memory_info.used / (1024 ** 3)
+        
+        mlflow.log_metric("cpu_usage_percent", cpu_percent, step=epoch)
+        mlflow.log_metric("memory_usage_percent", memory_percent, step=epoch)
+        mlflow.log_metric("memory_used_gb", memory_used_gb, step=epoch)
+        
+        # Log GPU usage if available
+        if torch.cuda.is_available():
+            gpu_memory_allocated = torch.cuda.memory_allocated(device) / (1024 ** 3)
+            gpu_memory_reserved = torch.cuda.memory_reserved(device) / (1024 ** 3)
+            gpu_utilization = torch.cuda.utilization(device) if hasattr(torch.cuda, 'utilization') else None
+            
+            mlflow.log_metric("gpu_memory_allocated_gb", gpu_memory_allocated, step=epoch)
+            mlflow.log_metric("gpu_memory_reserved_gb", gpu_memory_reserved, step=epoch)
+            if gpu_utilization is not None:
+                mlflow.log_metric("gpu_utilization_percent", gpu_utilization, step=epoch)
+
+
         # Validation Loop
         model.eval()
         val_loss = 0
@@ -85,8 +117,6 @@ def main(cfg: DictConfig):
 
     # Save the trained model: Can be also implemented to save best model based on validation loss
     torch.save(model.state_dict(), cfg.training.model_save_path)
-    print(f"Model saved to {cfg.training.model_save_path}")
-    mlflow.pytorch.log_model(model, cfg.training.model_save_path)
     print("Training complete.")
 
 if __name__ == "__main__":
