@@ -117,8 +117,6 @@ class TransformerEncoderLayer(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
-        
-
 
 class PositionalEncoding(nn.Module):    
     """Implements Rotary Positional Encoding (RoPE) for transformer models.

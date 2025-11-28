@@ -19,6 +19,7 @@ dependencies = [
   "transformers >=4.30",
   "accelerate >=0.20",
   "wandb >=0.15",
+  "hydra-core>=1.3.2",
 ]
 
 [project.scripts]
