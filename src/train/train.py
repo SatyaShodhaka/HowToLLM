@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
         model = model.to(device)
         # Print model parameter count
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"Model has {total_params} trainable parameters.")
+        print(f"Model has {total_params:,} trainable parameters.")
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay)
         loss_func = torch.nn.CrossEntropyLoss() 
 

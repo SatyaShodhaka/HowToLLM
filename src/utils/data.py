@@ -43,10 +43,6 @@ class LMDataset(Dataset):
 def train_tokenizer(file_path, vocab_size=32000, save_dir="data/tokenizer"):
     """Trains a BPE tokenizer on the given dataset."""
     save_path = os.path.join(save_dir, "tokenizer.json")
-    if os.path.exists(save_path):
-        print("Tokenizer: Loading existing tokenizer from:", save_path)
-        tokenizer = Tokenizer.from_file(save_path)
-        return tokenizer
     
     print("Tokenizer: Training new tokenizer and saving to:", save_path)
     tokenizer = Tokenizer(models.BPE())
@@ -68,7 +64,7 @@ def train_tokenizer(file_path, vocab_size=32000, save_dir="data/tokenizer"):
         "eos_token_id": tokenizer.token_to_id("</s>")
     }
     print("Tokenizer: Trained tokenizer vocab size:", tokenizer.get_vocab_size())
-    train_tokenizer(args.file_path, args.vocab_size, args.save_dir)
+   
     metadata_path = os.path.join(save_dir, "tokenizer_metadata.json")
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(tokenizer_metadata, f, ensure_ascii=False, indent=2)
